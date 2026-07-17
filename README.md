@@ -1,21 +1,21 @@
 \#\[no\_panic\]
 ===============
 
-[<img alt="github" src="https://img.shields.io/badge/github-dtolnay/no--panic-8da0cb?style=for-the-badge&labelColor=555555&logo=github" height="20">](https://github.com/dtolnay/no-panic)
+[<img alt="github" src="https://img.shields.io/badge/github-nazar-pc/no--panic-8da0cb?style=for-the-badge&labelColor=555555&logo=github" height="20">](https://github.com/nazar-pc/no-panic)
 [<img alt="crates.io" src="https://img.shields.io/crates/v/no-panic.svg?style=for-the-badge&color=fc8d62&logo=rust" height="20">](https://crates.io/crates/no-panic)
 [<img alt="docs.rs" src="https://img.shields.io/badge/docs.rs-no--panic-66c2a5?style=for-the-badge&labelColor=555555&logo=docs.rs" height="20">](https://docs.rs/no-panic)
-[<img alt="build status" src="https://img.shields.io/github/actions/workflow/status/dtolnay/no-panic/ci.yml?branch=master&style=for-the-badge" height="20">](https://github.com/dtolnay/no-panic/actions?query=branch%3Amaster)
+[<img alt="build status" src="https://img.shields.io/github/actions/workflow/status/nazar-pc/no-panic/ci.yml?branch=master&style=for-the-badge" height="20">](https://github.com/nazar-pc/no-panic/actions?query=branch%3Amaster)
 
 A Rust attribute macro to require that the compiler prove a function can't ever
 panic.
 
 ```toml
 [dependencies]
-no-panic = "0.1"
+no-panic-const = "0.1"
 ```
 
 ```rust
-use no_panic::no_panic;
+use no_panic_const::no_panic;
 
 #[no_panic]
 fn demo(s: &str) -> &str {
@@ -50,12 +50,12 @@ b8d9f':
 _panic_demo..demo..__NoPanic$u20$as$u20$core..ops..drop..Drop$GT$4drop17h72f8f42
 3002b8d9fE+0x2): undefined reference to `
 
-          ERROR[no-panic]: detected panic in function `demo`
+          ERROR[no-panic-const]: detected panic in function `demo`
           '
           collect2: error: ld returned 1 exit status
 ```
 
-The error is not stellar but notice the ERROR\[no-panic\] part at the end that
+The error is not stellar but notice the ERROR\[no-panic-const\] part at the end that
 provides the name of the offending function.
 
 <br>
@@ -75,11 +75,12 @@ provides the name of the offending function.
   detected. After confirming absence of panics, you can of course still ship
   your software as a `panic = "abort"` build.
 
-- Const functions are not supported. The attribute will fail to compile if
-  placed on a `const fn`.
+- Const functions **are supported** (in this fork with nightly Rust feature
+  `const_closures`). When using with const traits, `#[no_panic(const)]` must be
+  used instead of just `#[no_panic]` for the macro to have the necessary context.
 
 If you find that code requires optimization to pass `#[no_panic]`, either make
-no-panic an optional dependency that you only enable in release builds, or add a
+no-panic-const an optional dependency that you only enable in release builds, or add a
 section like the following to your Cargo.toml or .cargo/config.toml to enable
 very basic optimization in debug builds.
 

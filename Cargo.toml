@@ -1,14 +1,13 @@
 [package]
-name = "no-panic"
-version = "0.1.36"
-authors = ["David Tolnay <dtolnay@gmail.com>"]
+name = "no-panic-const"
+version = "0.1.36+const-0"
+authors = ["David Tolnay <dtolnay@gmail.com>", "Nazar Mokrynskyi <nazar@mokrynskyi.com>"]
 categories = ["no-std", "no-std::no-alloc"]
-description = "Attribute macro to require that the compiler prove a function can't ever panic."
-documentation = "https://docs.rs/no-panic"
+description = "Fork of no-panic crate with const fn and const Trait support"
+documentation = "https://docs.rs/no-panic-const"
 edition = "2021"
 license = "MIT OR Apache-2.0"
-repository = "https://github.com/dtolnay/no-panic"
-rust-version = "1.71"
+repository = "https://github.com/nazar-pc/no-panic"
 
 [lib]
 proc-macro = true

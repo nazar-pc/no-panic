@@ -1,4 +1,4 @@
-//! [![github]](https://github.com/dtolnay/no-panic)&ensp;[![crates-io]](https://crates.io/crates/no-panic)&ensp;[![docs-rs]](https://docs.rs/no-panic)
+//! [![github]](https://github.com/dtolnay/no-panic-const)&ensp;[![crates-io]](https://crates.io/crates/no-panic-const)&ensp;[![docs-rs]](https://docs.rs/no-panic-const)
 //!
 //! [github]: https://img.shields.io/badge/github-8da0cb?style=for-the-badge&labelColor=555555&logo=github
 //! [crates-io]: https://img.shields.io/badge/crates.io-fc8d62?style=for-the-badge&labelColor=555555&logo=rust
@@ -11,11 +11,11 @@
 //!
 //! ```toml
 //! [dependencies]
-//! no-panic = "0.1"
+//! no-panic-const = "0.1"
 //! ```
 //!
 //! ```
-//! use no_panic::no_panic;
+//! use no_panic_const::no_panic;
 //!
 //! #[no_panic]
 //! fn demo(s: &str) -> &str {
@@ -58,12 +58,12 @@
 //! _panic_demo..demo..__NoPanic$u20$as$u20$core..ops..drop..Drop$GT$4drop17h72f8f42
 //! 3002b8d9fE+0x2): undefined reference to `
 //!
-//!           ERROR[no-panic]: detected panic in function `demo`
+//!           ERROR[no-panic-const]: detected panic in function `demo`
 //!           '
 //!           collect2: error: ld returned 1 exit status
 //! ```
 //!
-//! The error is not stellar but notice the ERROR\[no-panic\] part at the end
+//! The error is not stellar but notice the ERROR\[no-panic-const\] part at the end
 //! that provides the name of the offending function.
 //!
 //! <br>
@@ -84,11 +84,12 @@
 //!   be detected. After confirming absence of panics, you can of course still
 //!   ship your software as a `panic = "abort"` build.
 //!
-//! - Const functions are not supported. The attribute will fail to compile if
-//!   placed on a `const fn`.
+//! - Const functions **are supported** (in this fork with nightly Rust feature
+//!   `const_closures`). When using with const traits, `#[no_panic(const)]` must be
+//!   used instead of just `#[no_panic]` for the macro to have the necessary context.
 //!
 //! If you find that code requires optimization to pass `#[no_panic]`, either
-//! make no-panic an optional dependency that you only enable in release builds,
+//! make no-panic-const an optional dependency that you only enable in release builds,
 //! or add a section like the following to your Cargo.toml or .cargo/config.toml
 //! to enable very basic optimization in debug builds.
 //!
@@ -132,7 +133,6 @@
 //! [Kixunil]: https://github.com/Kixunil
 //! [`dont_panic`]: https://github.com/Kixunil/dont_panic
 
-#![doc(html_root_url = "https://docs.rs/no-panic/0.1.36")]
 #![allow(
     clippy::doc_markdown,
     clippy::match_same_arms,
@@ -147,7 +147,8 @@ use proc_macro::TokenStream;
 use proc_macro2::{Span, TokenStream as TokenStream2};
 use quote::quote;
 use std::mem;
-use syn::parse::{Error, Nothing, Result};
+use syn::ext::IdentExt;
+use syn::parse::{Error, Parser, Result};
 use syn::{
     parse_quote, FnArg, GenericArgument, Ident, ItemFn, Pat, PatType, Path, PathArguments,
     ReturnType, Token, Type, TypeInfer, TypeParamBound,
@@ -158,8 +159,8 @@ pub fn no_panic(args: TokenStream, input: TokenStream) -> TokenStream {
     let args = TokenStream2::from(args);
     let input = TokenStream2::from(input);
     TokenStream::from(match parse(args, input.clone()) {
-        Ok(function) => {
-            let expanded = expand_no_panic(function);
+        Ok((function, is_const)) => {
+            let expanded = expand_no_panic(function, is_const);
             quote! {
                 #[cfg(not(doc))]
                 #expanded
@@ -178,22 +179,30 @@ pub fn no_panic(args: TokenStream, input: TokenStream) -> TokenStream {
     })
 }
 
-fn parse(args: TokenStream2, input: TokenStream2) -> Result<ItemFn> {
+fn parse(args: TokenStream2, input: TokenStream2) -> Result<(ItemFn, bool)> {
     let function: ItemFn = syn::parse2(input)?;
-    let _: Nothing = syn::parse2::<Nothing>(args)?;
-    if function.sig.constness.is_some() {
-        return Err(Error::new(
-            Span::call_site(),
-            "no_panic attribute on const fn is not supported",
-        ));
-    }
+
+    let is_const = if args.is_empty() {
+        false
+    } else {
+        let ident: Ident = Ident::parse_any.parse2(args)?;
+        if ident != "const" {
+            return Err(Error::new_spanned(
+                ident,
+                "expected `#[no_panic]` or `#[no_panic(const)]`",
+            ));
+        }
+        true
+    };
+
     if function.sig.asyncness.is_some() {
         return Err(Error::new(
             Span::call_site(),
             "no_panic attribute on async fn is not supported",
         ));
     }
-    Ok(function)
+
+    Ok((function, is_const))
 }
 
 // Convert `Path<impl Trait>` to `Path<_>`
@@ -237,7 +246,7 @@ fn make_impl_trait_wild_in_path(path: &mut Path) {
     }
 }
 
-fn expand_no_panic(mut function: ItemFn) -> TokenStream2 {
+fn expand_no_panic(mut function: ItemFn, is_const: bool) -> TokenStream2 {
     let mut move_self = None;
     let mut arg_attrs = Vec::new();
     let mut arg_pat = Vec::new();
@@ -291,7 +300,7 @@ fn expand_no_panic(mut function: ItemFn) -> TokenStream2 {
     };
     let stmts = function.block.stmts;
     let message = format!(
-        "\n\nERROR[no-panic]: detected panic in function `{}`\n",
+        "\n\nERROR[no-panic-const]: detected panic in function `{}`\n",
         function.sig.ident,
     );
     let unsafe_extern = if cfg!(no_unsafe_extern_blocks) {
@@ -299,6 +308,14 @@ fn expand_no_panic(mut function: ItemFn) -> TokenStream2 {
     } else {
         Some(Token![unsafe](Span::call_site()))
     };
+    let maybe_const = function.sig.constness.or_else(|| {
+        if is_const {
+            Some(Token![const](Span::call_site()))
+        } else {
+            None
+        }
+    });
+
     *function.block = parse_quote!({
         struct __NoPanic;
         #unsafe_extern extern "C" {
@@ -313,7 +330,7 @@ fn expand_no_panic(mut function: ItemFn) -> TokenStream2 {
             }
         }
         let __guard = __NoPanic;
-        let __result = (move || #ret {
+        let __result = (#maybe_const move || #ret {
             #move_self
             #(
                 #(#arg_attrs)*
