@@ -1,6 +1,6 @@
 [package]
 name = "no-panic-const"
-version = "0.1.36+const-0"
+version = "0.1.36-const-0"
 authors = ["David Tolnay <dtolnay@gmail.com>", "Nazar Mokrynskyi <nazar@mokrynskyi.com>"]
 categories = ["no-std", "no-std::no-alloc"]
 description = "Fork of no-panic crate with const fn and const Trait support"
